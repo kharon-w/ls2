@@ -1,0 +1,2068 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Редактор ЛС</title>
+<style>
+:root{
+  --shell-width: 1440px;
+  --ui-font: 14px;
+  --code-font-size: 13px;
+  --sticky-offset: 88px;
+  --gap: 16px;
+  --gap-sm: 10px;
+  --pad: 16px;
+  --pad-lg: 20px;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --control-h: 40px;
+  --nav-width: 250px;
+  --editor-split-left: minmax(220px, var(--nav-width));
+  --editor-split-right: minmax(0,1fr);
+  --shadow: 0 10px 30px rgba(0,0,0,.12);
+  --shadow-soft: 0 4px 16px rgba(0,0,0,.07);
+
+  --bg: #0f1115;
+  --bg-2: #141820;
+  --panel: #171b23;
+  --panel-2: #1c212a;
+  --line: #2a313d;
+  --line-soft: rgba(255,255,255,.06);
+  --text: #edf1f7;
+  --muted: #95a0b1;
+  --muted-2: #7d8798;
+  --accent: #89a6ff;
+  --accent-2: #5c7dff;
+  --accent-soft: rgba(137,166,255,.12);
+  --danger: #d87d8c;
+  --success: #79b796;
+  --code-bg: #0d1016;
+}
+body.theme-light{
+  --bg: #eff2f7;
+  --bg-2: #f6f7fb;
+  --panel: #ffffff;
+  --panel-2: #fbfbfd;
+  --line: #dde3eb;
+  --line-soft: rgba(20,28,40,.06);
+  --text: #1e2735;
+  --muted: #667385;
+  --muted-2: #7c8797;
+  --accent: #5e79e8;
+  --accent-2: #4664db;
+  --accent-soft: rgba(94,121,232,.10);
+  --danger: #c8697b;
+  --success: #4d8b68;
+  --code-bg: #f5f7fb;
+  --shadow: 0 10px 28px rgba(59,74,112,.08);
+  --shadow-soft: 0 3px 14px rgba(59,74,112,.05);
+}
+body[data-density="compact"]{
+  --gap: 14px;
+  --gap-sm: 8px;
+  --pad: 14px;
+  --pad-lg: 16px;
+  --radius: 16px;
+  --radius-sm: 11px;
+  --control-h: 38px;
+}
+body[data-density="comfortable"]{
+  --gap: 18px;
+  --gap-sm: 12px;
+  --pad: 18px;
+  --pad-lg: 22px;
+  --radius: 20px;
+  --radius-sm: 14px;
+  --control-h: 42px;
+}
+body[data-page-width="narrow"]{ --shell-width: 1240px; --nav-width: 220px; }
+body[data-page-width="standard"]{ --shell-width: 1440px; --nav-width: 250px; }
+body[data-page-width="wide"]{ --shell-width: 1660px; --nav-width: 270px; }
+body[data-ui-font="small"]{ --ui-font: 13px; }
+body[data-ui-font="medium"]{ --ui-font: 14px; }
+body[data-ui-font="large"]{ --ui-font: 15px; }
+body[data-code-size="small"]{ --code-font-size: 12px; }
+body[data-code-size="medium"]{ --code-font-size: 13px; }
+body[data-code-size="large"]{ --code-font-size: 14px; }
+
+*{ box-sizing:border-box; min-width:0; }
+html,body{ height:100%; }
+html{ scrollbar-gutter:stable; }
+body{
+  margin:0;
+  font: 400 var(--ui-font)/1.45 Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(137,166,255,.09), transparent 28%),
+    linear-gradient(180deg, var(--bg), var(--bg-2));
+  overflow-x:hidden;
+}
+button,input,textarea,select{ font:inherit; color:inherit; }
+img{ display:block; max-width:100%; }
+a{ color:inherit; }
+summary{ list-style:none; }
+summary::-webkit-details-marker{ display:none; }
+
+::-webkit-scrollbar{ width:10px; height:10px; }
+::-webkit-scrollbar-track{ background:transparent; }
+::-webkit-scrollbar-thumb{ background:rgba(137,166,255,.22); border-radius:999px; border:2px solid transparent; background-clip:padding-box; }
+
+.hidden{ display:none !important; }
+.small, .toolbar-label, .field label, .field .label, .small-caps{
+  font-size:11px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  font-weight:700;
+  color:var(--muted);
+}
+.muted{ color:var(--muted); }
+.kbd{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:24px;
+  padding:0 7px;
+  height:24px;
+  border-radius:9px;
+  border:1px solid var(--line);
+  background:var(--panel-2);
+  font:12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.app{
+  min-height:100vh;
+}
+.topbar{
+  position:sticky;
+  top:0;
+  z-index:80;
+  border-bottom:1px solid var(--line-soft);
+  background:color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: blur(14px);
+}
+.topbar-inner{
+  max-width:var(--shell-width);
+  margin:0 auto;
+  padding:12px 18px;
+  display:grid;
+  gap:12px;
+}
+.topbar-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.brand-mark{
+  width:42px;
+  height:42px;
+  border-radius:13px;
+  display:grid;
+  place-items:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:#fff;
+  font-weight:800;
+  letter-spacing:.08em;
+  box-shadow:0 10px 22px rgba(92,125,255,.22);
+  flex:0 0 auto;
+}
+.brand-copy h1{
+  margin:0;
+  font-size:1.1rem;
+  letter-spacing:-.02em;
+}
+.brand-copy p{
+  margin:2px 0 0;
+  color:var(--muted);
+  font-size:.93em;
+}
+.topbar-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.toolbar-chip{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px;
+  border:1px solid var(--line);
+  background:color-mix(in srgb, var(--panel) 92%, transparent);
+  border-radius:16px;
+  box-shadow:var(--shadow-soft);
+}
+.segmented{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+button, .btnlike{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  padding:0 13px;
+  min-height:var(--control-h);
+  color:var(--text);
+  cursor:pointer;
+  transition:.16s ease;
+  white-space:normal;
+  line-height:1.2;
+  overflow-wrap:anywhere;
+  box-shadow:var(--shadow-soft);
+}
+button:hover, .btnlike:hover{ border-color:color-mix(in srgb, var(--accent) 46%, var(--line)); transform:translateY(-1px); }
+button:active, .btnlike:active{ transform:translateY(0); }
+.seg-btn{ min-height:34px; padding:0 12px; font-weight:700; box-shadow:none; }
+.seg-btn.active,
+.primary-btn{
+  color:#fff;
+  border-color:transparent;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  box-shadow:0 10px 22px rgba(92,125,255,.22);
+}
+.soft-btn, .ghost-btn, .danger-btn, .icon-btn{
+  font-weight:600;
+}
+.ghost-btn{ background:transparent; box-shadow:none; }
+.danger-btn{ color:var(--danger); }
+.icon-btn{
+  width:34px;
+  min-width:34px;
+  padding:0;
+  font-size:1.15em;
+}
+
+.settings-pop{ position:relative; }
+.settings-pop > summary{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:34px;
+}
+.settings-pop[open] > summary{ border-color:color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.settings-menu{
+  position:absolute;
+  top:calc(100% + 10px);
+  right:0;
+  width:min(700px, calc(100vw - 36px));
+  padding:14px;
+  display:grid;
+  gap:14px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  box-shadow:var(--shadow);
+}
+.settings-grid{
+  display:grid;
+  grid-template-columns:repeat(5, minmax(120px,1fr));
+  gap:12px;
+}
+.control-card{
+  display:grid;
+  gap:7px;
+}
+.select, .input, .textarea, .search-input{
+  width:100%;
+  border:1px solid var(--line);
+  background:color-mix(in srgb, var(--panel) 86%, transparent);
+  color:var(--text);
+  border-radius:12px;
+  outline:none;
+  transition:border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.input, .search-input, .select{ height:var(--control-h); padding:0 12px; }
+.textarea{
+  min-height:98px;
+  padding:12px;
+  resize:vertical;
+}
+.input:focus, .search-input:focus, .textarea:focus, .select:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.switch-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.switch{ position:relative; width:48px; height:28px; flex:0 0 auto; }
+.switch input{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+.switch span{
+  display:block;
+  width:100%; height:100%;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:color-mix(in srgb, var(--panel) 86%, transparent);
+  position:relative;
+}
+.switch span::after{
+  content:"";
+  position:absolute;
+  top:2px; left:2px;
+  width:22px; height:22px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 3px 10px rgba(0,0,0,.18);
+  transition:.18s ease;
+}
+.switch input:checked + span{ background:color-mix(in srgb, var(--accent) 36%, var(--panel)); border-color:color-mix(in srgb, var(--accent) 58%, var(--line)); }
+.switch input:checked + span::after{ transform:translateX(20px); }
+
+.shell-main{
+  max-width:var(--shell-width);
+  margin:0 auto;
+  padding:18px;
+}
+.page{ display:none; }
+.page.active{ display:block; }
+.workspace-grid{
+  display:grid;
+  grid-template-columns:minmax(0, 1.12fr) minmax(390px, .88fr);
+  gap:16px;
+  align-items:start;
+}
+.editor-stack{ display:grid; gap:16px; min-width:0; }
+
+.panel, .code-panel, .status-note, .info-badge, .item-btn, .entry, .asset, .coupon-entry, .raw-card{
+  border:1px solid var(--line);
+  background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-soft);
+}
+.panel-head, .code-head, .entry-head, .asset-head, .coupon-head, .raw-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.panel-card > .panel-head,
+.code-panel > .code-head{
+  padding:var(--pad);
+  border-bottom:1px solid var(--line-soft);
+}
+.panel-body{ padding:var(--pad); display:grid; gap:var(--gap); }
+.panel h2, .panel h3, .code-panel h2{ margin:0; font-size:1rem; letter-spacing:-.02em; }
+.panel p, .code-panel p{ margin:0; }
+.intro-copy{ display:grid; gap:5px; }
+.group-actions, .top-actions, .code-actions, .meta-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.status-note{
+  padding:12px 14px;
+  color:var(--muted);
+}
+.warning, .success{
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid var(--line);
+}
+.warning{
+  background:rgba(230,178,92,.10);
+  border-color:rgba(230,178,92,.18);
+}
+.success{
+  background:rgba(91,177,130,.10);
+  border-color:rgba(91,177,130,.18);
+}
+
+.fold{
+  overflow:hidden;
+}
+.fold > summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  cursor:pointer;
+  padding:var(--pad);
+  font-weight:700;
+  user-select:none;
+}
+.fold > summary .summary-text{ display:flex; align-items:center; gap:10px; }
+.fold > summary .summary-text small{ color:var(--muted); font-weight:500; }
+.fold > summary::after{
+  content:"▾";
+  color:var(--muted);
+  transition:transform .16s ease;
+}
+.fold[open] > summary::after{ transform:rotate(180deg); }
+.fold > summary + .panel-body{ border-top:1px solid var(--line-soft); }
+
+.field-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:12px;
+}
+.field-grid.three{ grid-template-columns:repeat(3, minmax(0,1fr)); }
+.field{ display:grid; gap:7px; }
+.inline-split{
+  display:grid;
+  grid-template-columns:var(--editor-split-left) var(--editor-split-right);
+  gap:14px;
+  align-items:start;
+}
+.list-column, .editor-column{
+  display:grid;
+  gap:12px;
+}
+.list-box{
+  display:grid;
+  gap:8px;
+  max-height:380px;
+  overflow:auto;
+  padding-right:2px;
+}
+.item-btn{
+  text-align:left;
+  width:100%;
+  padding:12px;
+  font-weight:600;
+  box-shadow:none;
+}
+.item-btn strong{ display:block; margin-bottom:3px; }
+.item-btn .small{ white-space:normal; overflow-wrap:anywhere; }
+.item-btn.active{
+  border-color:color-mix(in srgb, var(--accent) 58%, var(--line));
+  background:color-mix(in srgb, var(--accent-soft) 82%, var(--panel));
+}
+
+.entry, .asset, .coupon-entry, .raw-card{
+  padding:12px;
+  box-shadow:none;
+}
+.entry-head, .asset-head, .coupon-head, .raw-card-head{ margin-bottom:10px; }
+.entry-title, .asset-title, .coupon-title{ font-weight:800; }
+.episode-list, .asset-list, .coupon-list, .raw-grid, .stack{ display:grid; gap:10px; }
+.char-chip, .info-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 9px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:var(--panel-2);
+  color:var(--muted);
+  font-size:.84em;
+}
+.info-badge{ width:max-content; max-width:100%; }
+.section-divider{ padding-top:8px; border-top:1px dashed var(--line); }
+.section-tools{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.asset-section{ display:grid; gap:12px; }
+
+.code-panel{
+  position:sticky;
+  top:var(--sticky-offset);
+  overflow:hidden;
+}
+.code-wrap{
+  position:relative;
+  background:var(--code-bg);
+  border-top:1px solid var(--line-soft);
+  border-bottom:1px solid var(--line-soft);
+  min-height:320px;
+  max-height:calc(100vh - 210px);
+  overflow:auto;
+}
+.code-pre, .code-textarea{
+  margin:0;
+  padding:16px 18px;
+  font:var(--code-font-size)/1.6 "JetBrains Mono","SFMono-Regular",Consolas,monospace;
+  white-space:pre-wrap;
+  word-break:break-word;
+  tab-size:2;
+}
+body[data-code-wrap="off"] .code-pre,
+body[data-code-wrap="off"] .code-textarea{
+  white-space:pre;
+  word-break:normal;
+}
+.code-pre{ min-height:100%; color:var(--text); }
+.code-textarea{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  background:transparent;
+  color:transparent;
+  caret-color:var(--text);
+  border:0;
+  resize:none;
+  outline:none;
+  overflow:auto;
+}
+.code-textarea::selection{ background:rgba(137,166,255,.30); }
+.preview-banner, .panel-foot{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:12px 14px;
+  color:var(--muted);
+  font-size:.9em;
+}
+
+.token-comment{ color:#7f8aa0; }
+.token-tag{ color:#7fb3ff; }
+.token-attr{ color:#f2bc79; }
+.token-string{ color:#94dba2; }
+body.theme-light .token-comment{ color:#7f8796; }
+body.theme-light .token-tag{ color:#2f67d3; }
+body.theme-light .token-attr{ color:#9d6500; }
+body.theme-light .token-string{ color:#24794d; }
+
+.footer-note{ padding:0 2px; color:var(--muted); font-size:.92em; }
+
+@media (max-width: 1380px){
+  .workspace-grid{ grid-template-columns:minmax(0,1fr) minmax(350px,.9fr); }
+}
+@media (max-width: 1220px){
+  .workspace-grid{ grid-template-columns:1fr; }
+  .code-panel{ position:relative; top:auto; }
+  .code-wrap{ max-height:460px; }
+}
+@media (max-width: 980px){
+  .settings-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .inline-split{ grid-template-columns:1fr; }
+  .list-box{ max-height:220px; }
+}
+@media (max-width: 760px){
+  .shell-main{ padding:14px; }
+  .topbar-inner{ padding:12px 14px; }
+  .field-grid, .field-grid.three, .settings-grid{ grid-template-columns:1fr; }
+  .topbar-row{ align-items:flex-start; }
+  .topbar-actions{ width:100%; justify-content:flex-start; }
+  .settings-menu{ position:fixed; left:14px; right:14px; width:auto; }
+}
+</style>
+</head>
+<body class="theme-dark" data-density="compact" data-page-width="standard" data-ui-font="medium" data-code-size="medium" data-code-wrap="on">
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-row">
+        <div class="brand">
+          <div class="brand-mark">LS</div>
+          <div class="brand-copy">
+            <h1>Редактор ЛС</h1>
+            <p>Минималистичный, компактный и удобный на ноутбуке. Код всегда рядом.</p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="toolbar-chip">
+            <div class="segmented">
+              <button class="seg-btn active" data-page="new">Новый ЛС</button>
+              <button class="seg-btn" data-page="edit">Существующий ЛС</button>
+            </div>
+          </div>
+
+          <div class="toolbar-chip">
+            <div class="segmented">
+              <button class="seg-btn active" data-theme="dark">Тёмная</button>
+              <button class="seg-btn" data-theme="light">Светлая</button>
+            </div>
+          </div>
+
+          <details class="settings-pop" id="ui-settings-pop">
+            <summary class="ghost-btn">Настройки</summary>
+            <div class="settings-menu">
+              <div class="settings-grid">
+                <div class="control-card">
+                  <label class="toolbar-label" for="ui-font-scale">Шрифт</label>
+                  <select id="ui-font-scale" class="select">
+                    <option value="small">Меньше</option>
+                    <option value="medium" selected>Стандарт</option>
+                    <option value="large">Крупнее</option>
+                  </select>
+                </div>
+
+                <div class="control-card">
+                  <label class="toolbar-label" for="ui-page-width">Ширина</label>
+                  <select id="ui-page-width" class="select">
+                    <option value="narrow">Узкая</option>
+                    <option value="standard" selected>Стандарт</option>
+                    <option value="wide">Шире</option>
+                  </select>
+                </div>
+
+                <div class="control-card">
+                  <label class="toolbar-label" for="ui-density">Плотность</label>
+                  <select id="ui-density" class="select">
+                    <option value="compact" selected>Компактно</option>
+                    <option value="comfortable">Свободнее</option>
+                  </select>
+                </div>
+
+                <div class="control-card">
+                  <label class="toolbar-label" for="ui-code-size">Код</label>
+                  <select id="ui-code-size" class="select">
+                    <option value="small">Меньше</option>
+                    <option value="medium" selected>Стандарт</option>
+                    <option value="large">Крупнее</option>
+                  </select>
+                </div>
+
+                <div class="control-card">
+                  <label class="toolbar-label">Перенос строк</label>
+                  <div class="switch-row" style="min-height:var(--control-h);">
+                    <label class="switch">
+                      <input id="ui-code-wrap" type="checkbox" checked>
+                      <span></span>
+                    </label>
+                    <span class="muted">В коде</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel-foot">
+                <span class="muted">Эти настройки сохраняются в браузере на этом устройстве.</span>
+                <button id="ui-reset-settings" class="soft-btn">Сбросить настройки</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell-main">
+    <section class="page active" data-page-panel="new">
+      <div class="workspace-grid">
+        <div class="editor-stack">
+          <div class="panel panel-card">
+            <div class="panel-head">
+              <div class="intro-copy">
+                <h2>Вставка нового ЛС</h2>
+                <p class="muted">Собирает код на основе базового шаблона. Комментарии и структура сохраняются.</p>
+              </div>
+              <div class="group-actions">
+                <button class="soft-btn" id="new-reset">Сбросить</button>
+                <button class="primary-btn" id="new-copy-top">Копировать итог</button>
+              </div>
+            </div>
+          </div>
+
+          <details class="panel fold" open>
+            <summary>
+              <span class="summary-text">Персонажи и хроно <small>имена, ссылки, цитаты, эпизоды</small></span>
+            </summary>
+            <div class="panel-body">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="new-page-bg">Фон личной страницы</label>
+                  <input id="new-page-bg" class="input" type="text" placeholder="Ссылка на картинку">
+                </div>
+                <div class="field">
+                  <label for="new-char-search">Поиск персонажа</label>
+                  <input id="new-char-search" class="search-input" type="text" placeholder="Имя, англ имя, ярлык">
+                </div>
+              </div>
+
+              <div class="inline-split">
+                <div class="list-column">
+                  <div class="section-tools">
+                    <div class="small">Персонажи</div>
+                    <button class="soft-btn" id="new-add-char">Добавить</button>
+                  </div>
+                  <div class="list-box" id="new-char-list"></div>
+                </div>
+
+                <div class="editor-column" id="new-char-editor"></div>
+              </div>
+            </div>
+          </details>
+
+          <details class="panel fold" open>
+            <summary>
+              <span class="summary-text">Фоны, плашки, ачивки, коллекция, купоны <small>visual и raw</small></span>
+            </summary>
+            <div class="panel-body">
+              <div class="section-tools">
+                <div class="switch-row">
+                  <span class="small">Visual / raw</span>
+                  <label class="switch"><input type="checkbox" id="new-raw-toggle"><span></span></label>
+                </div>
+              </div>
+              <div id="new-assets-editor" class="asset-section"></div>
+            </div>
+          </details>
+        </div>
+
+        <aside class="code-panel">
+          <div class="code-head">
+            <div class="intro-copy">
+              <h2>Итоговый код</h2>
+              <p class="muted">Видишь результат рядом во время редактирования.</p>
+            </div>
+            <div class="code-actions">
+              <button class="soft-btn" id="new-refresh">Обновить</button>
+              <button class="primary-btn" id="new-copy">Копировать итог</button>
+            </div>
+          </div>
+          <div class="code-wrap code-static">
+            <pre class="code-pre" id="new-output-pre"></pre>
+          </div>
+          <div class="preview-banner">
+            <span>Код обновляется автоматически.</span>
+            <span id="new-output-stats"></span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" data-page-panel="edit">
+      <div class="workspace-grid">
+        <div class="editor-stack">
+          <div class="panel panel-card">
+            <div class="panel-head">
+              <div class="intro-copy">
+                <h2>Вставка существующего ЛС</h2>
+                <p class="muted">Загружает уже готовый код, разбирает его на поля и собирает обратно без грубого перезатирания.</p>
+              </div>
+              <div class="group-actions">
+                <button class="soft-btn" id="edit-load-default">Загрузить базовый код</button>
+                <button class="primary-btn" id="edit-copy-top">Копировать итог</button>
+              </div>
+            </div>
+          </div>
+
+          <details class="panel fold" open>
+            <summary>
+              <span class="summary-text">Код для загрузки <small>вставь код и загрузи в редактор</small></span>
+            </summary>
+            <div class="panel-body">
+              <div class="group-actions">
+                <button class="soft-btn" id="edit-load">Загрузить в редактор</button>
+                <button class="soft-btn" id="edit-clear">Очистить</button>
+              </div>
+              <div class="code-wrap">
+                <pre class="code-pre" id="edit-input-pre"></pre>
+                <textarea class="code-textarea" id="edit-input-area" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </details>
+
+          <div class="success" id="edit-status">Готово к загрузке. Вставь код ЛС и нажми «Загрузить в редактор».</div>
+
+          <details class="panel fold" open>
+            <summary>
+              <span class="summary-text">Персонажи и хроно <small>поиск, выбор, редактирование</small></span>
+            </summary>
+            <div class="panel-body">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="edit-page-bg">Фон личной страницы</label>
+                  <input id="edit-page-bg" class="input" type="text" placeholder="Ссылка на картинку">
+                </div>
+                <div class="field">
+                  <label for="edit-char-search">Поиск персонажа</label>
+                  <input id="edit-char-search" class="search-input" type="text" placeholder="Имя, англ имя, ярлык">
+                </div>
+              </div>
+
+              <div class="inline-split">
+                <div class="list-column">
+                  <div class="section-tools">
+                    <div class="small">Персонажи</div>
+                    <button class="soft-btn" id="edit-add-char">Добавить</button>
+                  </div>
+                  <div class="list-box" id="edit-char-list"></div>
+                </div>
+
+                <div class="editor-column" id="edit-char-editor"></div>
+              </div>
+            </div>
+          </details>
+
+          <details class="panel fold" open>
+            <summary>
+              <span class="summary-text">Фоны, плашки, ачивки, коллекция, купоны <small>visual и raw</small></span>
+            </summary>
+            <div class="panel-body">
+              <div class="section-tools">
+                <div class="switch-row">
+                  <span class="small">Visual / raw</span>
+                  <label class="switch"><input type="checkbox" id="edit-raw-toggle"><span></span></label>
+                </div>
+              </div>
+              <div id="edit-assets-editor" class="asset-section"></div>
+            </div>
+          </details>
+        </div>
+
+        <aside class="code-panel">
+          <div class="code-head">
+            <div class="intro-copy">
+              <h2>Итоговый код после редактирования</h2>
+              <p class="muted">То, что можно сразу копировать обратно.</p>
+            </div>
+            <div class="code-actions">
+              <button class="soft-btn" id="edit-refresh">Обновить</button>
+              <button class="primary-btn" id="edit-copy">Копировать итог</button>
+            </div>
+          </div>
+          <div class="code-wrap code-static">
+            <pre class="code-pre" id="edit-output-pre"></pre>
+          </div>
+          <div class="preview-banner">
+            <span>Структура сохраняется в твоём формате.</span>
+            <span id="edit-output-stats"></span>
+          </div>
+        </aside>
+      </div>
+
+      <div class="footer-note" style="margin-top:12px;">
+        Совет: на ноутбуке чаще всего лучше оставить <span class="kbd">Стандарт</span> ширину и <span class="kbd">Компактно</span> плотность.
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const DEFAULT_TEMPLATE = "<div class='character'> \n<info>\n\n<!-- ЛЕВАЯ ЧАСТЬ -->\n<div class=\"crow-info\">\n\n    <!--- ФОН ЛИЧНОЙ СТРАНИЦЫ --->\n    <img class=\"fon\" src=\"https://upforme.ru/uploads/001c/a1/8d/26/641428.png\">\n\n    <!-- переключатели персонажей  -->\n    <input type=\"radio\" name=\"char-tabs\" id=\"char-tab-1\" class=\"char-tab-input\" checked>\n\n\n    <!-- ИКОНКИ-ПЕРЕКЛЮЧАТЕЛИ МЕНЯЕМ АДРЕС КАРТИНОК -->\n\n<div class=\"ls-twnk\">\n\n        <label for=\"char-tab-1\" class=\"char-tip\">\n            <img src=\"https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png\" style=\"width:40px; border-radius:4px;\">\n            <span>Name Surname</span>\n        </label>\n\n</div>\n\n\n    <!-- ПЕРСОНАЖ 1 -->\n\n    <div class=\"char-content char-content-1\">\n        <name><a href=\"https://glimpse.rusff.me/profile.php?id=2\">Имя Фамилия</a></name>\n        <av><img src=\"https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png\"></av>\n        <about>цитата или короткое инфо</about>\n\n <!-- ХРОНО -->\n\n        <div class=\"eps-ls\">\n            <ls>\n\n                <div class=\"ep-altn\">Основная игра</div>\n                <div class=\"ep-link\">\n                    <a href=\"#\"><span>00.00.00</span> Эпизод персонажа 1</a>\n                    <span><a href=\"#\">имя</a><a href=\"#\">игрок</a></span>\n                </div>\n      \n\n\n                   <div class=\"ep-altn\">СНС эпизоды</div>\n                    <div class=\"ep-sns\">\n                    <a href=\"#\"><span>00.00.00</span> СНС эпизод 1</a>\n                    <span><a href=\"#\">имя</a><a href=\"#\">игрок</a></span>\n                </div>\n\n\n                   <div class=\"ep-altn\">Альтернатива       </div>\n                    <div class=\"ep-alt\">\n                    <a href=\"#\"><span>фд</span> Альтернативный эпизод</a>\n                    <span><a href=\"#\">имя</a><a href=\"#\">игрок</a></span>\n                </div>\n  \n\n            \n            </ls>\n        </div>\n    </div>\n\n  \n  <!-- КОНЕЦ ПЕРСОНАЖ 1 -->\n\n\n\n\n\n\n</div>\n\n\n\n<!--КОНЕЦ-->\n\n<div class=\"blood-act\">\n\n\n<!--НАЧАЛО ВКЛАДОК-->\n\n <!-- Скрытые радиокнопки для переключения вкладок -->\n        <input type=\"radio\" name=\"tabs\" id=\"tab1\" class=\"tab-input\" checked>\n        <input type=\"radio\" name=\"tabs\" id=\"tab2\" class=\"tab-input\">\n        \n        <!-- Заголовки вкладок -->\n        <div class=\"tabs-header\">\n            <label for=\"tab1\" class=\"tab\">Фоны и плашки</label>\n            <label for=\"tab2\" class=\"tab\">Ачивки и коллекция</label>\n        </div>\n        \n        <!-- Содержимое вкладок -->\n        <div class=\"tab-content tab-content-1\">\n\n<!--ПЕРВАЯ ВКЛАДКА-->\n\n<div class=\"ls-bl\">\n\n<!--ФОНЫ 1-->\n<div class=\"fst-block\"><span>фоны профиля</span>\n<wrap>\n<img src=\"https://forumstatic.ru/files/001c/a3/e7/96810.jpg\">\n\n</wrap>\n</div>\n<!--ФОНЫ 1-->\n\n<!--ФОНЫ 2-->\n<div class=\"lsfn-block\"><span>фоны лс</span>\n<wrap>\n<img class=\"fon\" src=\"https://forumstatic.ru/files/001c/a3/e7/96810.jpg\">\n\n</wrap>\n</div>\n\n</div>\n\n<!--ФОНЫ 2-->\n\n<!--ПЛАШКИ-->\n\n<div class=\"ls-bl2\">\n\n<div class=\"sec-block\"><span>плашки</span>\n<wrap>\n<div class=\"pf-plash\" style=\"background: url(https://forumstatic.ru/files/001c/a3/e7/96810.jpg);\">the crow <span class=\"pf-plash__sub\">bewails the sheep</span></div>\n</wrap>\n</div>\n\n<!--ПЛАШКИ-->\n\n</div>\n\n\n<!--КОНЕЦ ПЕРВАЯ ВКЛАДКА-->\n        </div>\n        \n        <div class=\"tab-content tab-content-2\">\n<!--ВТОРАЯ ВКЛАДКА-->\n\n<div class=\"ls2-bl\">\n\n<!--ачивки-->\n<div class=\"th-block\"><span>ачивки и подарки</span>\n<wrap >\n<div class=\"char-tip\"><img src=\"https://upforme.ru/uploads/001c/a1/8d/26/276860.png\"><span>Добро пожаловать!</span></div>\n</wrap>\n</div>\n<!--ачивки-->\n\n\n<!--коллекции-->\n<div class=\"th2-block\" class=\"char-tip\"><span>коллекция</span>\n<wrap>\n<div class=\"char-tip\"> <img src=\"https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png\"><span>Текст</span></div>\n<div class=\"char-tip\"> <img src=\"https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png\"><span>Текст</span></div>\n<div class=\"char-tip\"> <img src=\"https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png\"><span>Текст</span></div>\n\n\n</wrap>\n</div>\n<!--коллекции-->\n\n</div>\n\n<div class=\"ls2-cpn\">\n\n<!--купоны-->\n<div class=\"th3-block\"><span>купоны</span>\n<wrap>\n<div class=\"char-tip\"> <img class=\"nema\"  src=\"https://upforme.ru/uploads/001c/a1/8d/26/714012.png\"><span>КУПОН НА ТВИНКА: 0 шт</span></div>\n<div class=\"char-tip\"> <img class=\"nema\"  src=\"https://upforme.ru/uploads/001c/a1/8d/26/246859.png\"><span>КУПОН НА ЗАЩИТУ ОТ ЧИСТКИ: 0 шт</span></div>\n<div class=\"char-tip\"> <img class=\"nema\"  src=\"https://upforme.ru/uploads/001c/a1/8d/26/809895.png\"><span>КУПОН НА ЛИМИТНЫЙ НАБОР: 0 шт</span></div>\n<div class=\"char-tip\"> <img class=\"nema\"  src=\"https://upforme.ru/uploads/001c/a1/8d/26/596051.png\"><span>КУПОН НА ФОН ПРОФИЛЯ ИЛИ ЛС: 0 шт</span></div>\n<div class=\"char-tip\"> <img class=\"nema\"  src=\"https://upforme.ru/uploads/001c/a1/8d/26/459775.png\"><span>КУПОН НА ПЛАШКУ: 0 шт</span></div>\n<div class=\"char-tip\"> <img class=\"nema\"  src=\"https://upforme.ru/uploads/001c/a1/8d/26/639482.png\"><span>КУПОН НА ИКОНКУ В ПОДАРОК: 0 шт</span></div>\n<div class=\"char-tip\"> <img class=\"nema\"  src=\"https://upforme.ru/uploads/001c/a1/8d/26/489312.png\"><span>КУПОН НА АВАТАР ОТ АМС: 0 шт</span></div>\n<div class=\"char-tip\"> <img class=\"nema\"  src=\"https://upforme.ru/uploads/001c/a1/8d/26/836868.png\"><span>КУПОН НА ПРОПУСК ДНЯ В ДЕЙЛИКАХ: 0 шт</span></div>\n</wrap>\n</div>\n<!--купоны-->\n\n</div>\n\n\n\n\n\n<!--КОНЕЦ ВТОРАЯ ВКЛАДКА-->\n\n    </div>\n\n<!--КОНЕЦ ВКЛАДОК-->\n\n\n\n\n</div>\n\n</info>\n</div>";
+
+const couponCatalog = [
+  { key:'twin', label:'КУПОН НА ТВИНКА', src:'https://upforme.ru/uploads/001c/a1/8d/26/714012.png' },
+  { key:'clean', label:'КУПОН НА ЗАЩИТУ ОТ ЧИСТКИ', src:'https://upforme.ru/uploads/001c/a1/8d/26/246859.png' },
+  { key:'limit', label:'КУПОН НА ЛИМИТНЫЙ НАБОР', src:'https://upforme.ru/uploads/001c/a1/8d/26/809895.png' },
+  { key:'bg', label:'КУПОН НА ФОН ПРОФИЛЯ ИЛИ ЛС', src:'https://upforme.ru/uploads/001c/a1/8d/26/596051.png' },
+  { key:'plash', label:'КУПОН НА ПЛАШКУ', src:'https://upforme.ru/uploads/001c/a1/8d/26/459775.png' },
+  { key:'gifticon', label:'КУПОН НА ИКОНКУ В ПОДАРОК', src:'https://upforme.ru/uploads/001c/a1/8d/26/639482.png' },
+  { key:'avatar', label:'КУПОН НА АВАТАР ОТ АМС', src:'https://upforme.ru/uploads/001c/a1/8d/26/489312.png' },
+  { key:'daily', label:'КУПОН НА ПРОПУСК ДНЯ В ДЕЙЛИКАХ', src:'https://upforme.ru/uploads/001c/a1/8d/26/836868.png' }
+];
+
+const appState = {
+  page:'new',
+  theme:'dark',
+  newState:null,
+  editState:null,
+  newSelectedCharId:null,
+  editSelectedCharId:null,
+  newOutput:'',
+  editOutput:''
+};
+
+const dom = {};
+
+function uid(prefix='id'){
+  return `${prefix}-${Math.random().toString(36).slice(2,10)}`;
+}
+
+function deepClone(obj){
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function escapeHtml(str=''){
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function escapeAttr(str=''){
+  return escapeHtml(str).replace(/'/g,'&#39;');
+}
+
+function normalizeSpace(str=''){
+  return String(str).replace(/\s+/g,' ').trim();
+}
+
+function textWithoutChildren(el){
+  if(!el) return '';
+  let result = '';
+  el.childNodes.forEach(node => {
+    if(node.nodeType === 3) result += node.textContent;
+  });
+  return normalizeSpace(result);
+}
+
+function highlightHtml(text=''){
+  let html = escapeHtml(text);
+  html = html.replace(/(&lt;!--[\s\S]*?--&gt;)/g,'<span class="token-comment">$1</span>');
+  html = html.replace(/(&lt;\/?)([a-zA-Z0-9:-]+)/g,'$1<span class="token-tag">$2</span>');
+  html = html.replace(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)(=)/g,'<span class="token-attr">$1</span>$2');
+  html = html.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g,'<span class="token-string">$1</span>');
+  return html;
+}
+
+function syncEditableCode(textarea, pre){
+  pre.innerHTML = highlightHtml(textarea.value || '');
+  pre.scrollTop = textarea.scrollTop;
+  pre.scrollLeft = textarea.scrollLeft;
+}
+
+function setStaticCode(pre, text){
+  pre.innerHTML = highlightHtml(text || '');
+}
+
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve,reject)=>{
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      resolve();
+    }catch(err){ reject(err); }
+  });
+}
+
+function updateCopyStatus(target, okText='Скопировано'){ 
+  if(!target) return;
+  const old = target.textContent;
+  target.textContent = okText;
+  setTimeout(()=> target.textContent = old, 1400);
+}
+
+function defaultEpisode(type='main'){
+  return {
+    id:uid(type),
+    date:type === 'alt' ? 'фд' : '00.00.00',
+    title:type === 'sns' ? 'СНС эпизод' : type === 'alt' ? 'Альтернативный эпизод' : 'Эпизод персонажа',
+    link:'#',
+    partnerName:'имя',
+    partnerUrl:'#',
+    playerName:'игрок',
+    playerUrl:'#'
+  };
+}
+
+function defaultCharacter(index=1){
+  return {
+    id:uid('char'),
+    labelImage:'https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png',
+    labelText:`Name Surname${index > 1 ? ' ' + index : ''}`,
+    profileUrl:'#',
+    ruName:`Имя Фамилия${index > 1 ? ' ' + index : ''}`,
+    enName:`Name Surname${index > 1 ? ' ' + index : ''}`,
+    avatarUrl:'https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png',
+    about:'цитата или короткое инфо',
+    chronology:{
+      rawEnabled:false,
+      rawHtml:'',
+      extraHtml:'',
+      mainTitle:'Основная игра',
+      snsTitle:'СНС эпизоды',
+      altTitle:'Альтернатива',
+      main:[defaultEpisode('main')],
+      sns:[defaultEpisode('sns')],
+      alt:[defaultEpisode('alt')]
+    }
+  };
+}
+
+function defaultState(){
+  return {
+    pageBackground:'https://upforme.ru/uploads/001c/a1/8d/26/641428.png',
+    characters:[defaultCharacter(1)],
+    assets:{
+      rawEnabled:false,
+      rawProfileHtml:'<img src="https://forumstatic.ru/files/001c/a3/e7/96810.jpg">',
+      rawLsBgHtml:'<img class="fon" src="https://forumstatic.ru/files/001c/a3/e7/96810.jpg">',
+      rawPlashkiHtml:'<div class="pf-plash" style="background: url(https://forumstatic.ru/files/001c/a3/e7/96810.jpg);">the crow <span class="pf-plash__sub">bewails the sheep</span></div>',
+      rawAchievementsHtml:'<div class="char-tip"><img src="https://upforme.ru/uploads/001c/a1/8d/26/276860.png"><span>Добро пожаловать!</span></div>',
+      rawCollectionsHtml:'<div class="char-tip"><img src="https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png"><span>Текст</span></div>',
+      rawCouponsHtml:'',
+      profileBackgrounds:[{id:uid('pbg'),src:'https://forumstatic.ru/files/001c/a3/e7/96810.jpg'}],
+      lsBackgrounds:[{id:uid('lbg'),src:'https://forumstatic.ru/files/001c/a3/e7/96810.jpg'}],
+      plashki:[{id:uid('pl'),bg:'https://forumstatic.ru/files/001c/a3/e7/96810.jpg',title:'the crow',subtitle:'bewails the sheep'}],
+      achievements:[{id:uid('ach'),img:'https://upforme.ru/uploads/001c/a1/8d/26/276860.png',text:'Добро пожаловать!'}],
+      collections:[
+        {id:uid('col'),img:'https://forumavatars.ru/img/avatars/001c/a1/8d/2-1769246364.png',text:'Текст'}
+      ],
+      coupons:{
+        catalog:couponCatalog.map(item => ({...item, qty:0})),
+        custom:[]
+      }
+    }
+  };
+}
+
+function extractEpisode(el){
+  const mainA = el.querySelector(':scope > a');
+  const span = mainA ? mainA.querySelector('span') : null;
+  const metaLinks = el.querySelectorAll(':scope > span a');
+  const date = span ? normalizeSpace(span.textContent) : '';
+  let title = '';
+  if(mainA){
+    const clone = mainA.cloneNode(true);
+    const s = clone.querySelector('span');
+    if(s) s.remove();
+    title = normalizeSpace(clone.textContent);
+  }
+  return {
+    id:uid('ep'),
+    date:date || '',
+    title:title || '',
+    link:mainA ? (mainA.getAttribute('href') || '#') : '#',
+    partnerName:metaLinks[0] ? normalizeSpace(metaLinks[0].textContent) : 'имя',
+    partnerUrl:metaLinks[0] ? (metaLinks[0].getAttribute('href') || '#') : '#',
+    playerName:metaLinks[1] ? normalizeSpace(metaLinks[1].textContent) : 'игрок',
+    playerUrl:metaLinks[1] ? (metaLinks[1].getAttribute('href') || '#') : '#'
+  };
+}
+
+function extractWrapItems(wrap, kind){
+  const items = [];
+  if(!wrap) return items;
+  wrap.querySelectorAll(':scope > *').forEach(el => {
+    if(kind === 'img'){
+      if(el.matches('img')) items.push({id:uid('img'), src:el.getAttribute('src') || ''});
+    }
+    if(kind === 'plash' && el.matches('.pf-plash')){
+      const style = el.getAttribute('style') || '';
+      const match = style.match(/url\((['"]?)(.*?)\1\)/i);
+      items.push({
+        id:uid('plash'),
+        bg:match ? match[2] : '',
+        title:normalizeSpace(textWithoutChildren(el)),
+        subtitle:normalizeSpace(el.querySelector('.pf-plash__sub')?.textContent || '')
+      });
+    }
+    if(kind === 'tip' && el.matches('.char-tip')){
+      items.push({
+        id:uid('tip'),
+        img:el.querySelector('img')?.getAttribute('src') || '',
+        text:normalizeSpace(el.querySelector('span')?.textContent || '')
+      });
+    }
+  });
+  return items;
+}
+
+function parseCoupons(wrap){
+  const parsedCatalog = couponCatalog.map(item => ({...item, qty:0}));
+  const custom = [];
+  if(!wrap) return {catalog:parsedCatalog, custom};
+
+  wrap.querySelectorAll(':scope > .char-tip').forEach(el => {
+    const img = el.querySelector('img');
+    const spanText = normalizeSpace(el.querySelector('span')?.textContent || '');
+    const m = spanText.match(/^(.*?):\s*(\d+)\s*шт$/i);
+    const label = normalizeSpace(m ? m[1] : spanText);
+    const qty = Number(m ? m[2] : 0) || 0;
+    const src = img?.getAttribute('src') || '';
+    const found = parsedCatalog.find(item => item.label === label || item.src === src);
+    if(found){
+      found.qty = qty;
+      if(src && !found.src) found.src = src;
+    }else{
+      custom.push({id:uid('cpn'), label:label || 'КАСТОМНЫЙ КУПОН', src, qty});
+    }
+  });
+
+  return {catalog:parsedCatalog, custom};
+}
+
+function parseExistingCode(code){
+  try{
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div id="ls-root">${code}</div>`, 'text/html');
+    const root = doc.querySelector('#ls-root');
+    const state = defaultState();
+
+    const leftBg = root.querySelector('.crow-info > img.fon');
+    if(leftBg) state.pageBackground = leftBg.getAttribute('src') || state.pageBackground;
+
+    const labels = Array.from(root.querySelectorAll('.ls-twnk > label.char-tip'));
+    const contents = Array.from(root.querySelectorAll('.crow-info > .char-content'));
+
+    if(contents.length){
+      state.characters = contents.map((content, index) => {
+        const label = labels[index];
+        const nameAnchor = content.querySelector('name a');
+        const nameText = normalizeSpace(nameAnchor?.textContent || '');
+        let ruName = nameText;
+        let enName = label?.querySelector('span') ? normalizeSpace(label.querySelector('span').textContent) : '';
+        const explicitRu = content.querySelector('name .char-ru');
+        const explicitEn = content.querySelector('name .char-en');
+        if(explicitRu) ruName = normalizeSpace(explicitRu.textContent);
+        if(explicitEn) enName = normalizeSpace(explicitEn.textContent);
+        if(nameText.includes('/')){
+          const parts = nameText.split('/').map(s=>normalizeSpace(s));
+          ruName = parts[0] || ruName;
+          enName = parts[1] || enName;
+        }
+        const ls = content.querySelector('ls');
+        const titles = Array.from(ls?.querySelectorAll(':scope > .ep-altn') || []).map(el => normalizeSpace(el.textContent));
+        const chronology = {
+          rawEnabled:false,
+          rawHtml: ls ? ls.innerHTML.trim() : '',
+          extraHtml:'',
+          mainTitle: titles[0] || 'Основная игра',
+          snsTitle: titles[1] || 'СНС эпизоды',
+          altTitle: titles[2] || 'Альтернатива',
+          main: Array.from(ls?.querySelectorAll(':scope > .ep-link') || []).map(extractEpisode),
+          sns: Array.from(ls?.querySelectorAll(':scope > .ep-sns') || []).map(extractEpisode),
+          alt: Array.from(ls?.querySelectorAll(':scope > .ep-alt') || []).map(extractEpisode)
+        };
+        if(!chronology.main.length) chronology.main = [defaultEpisode('main')];
+        if(!chronology.sns.length) chronology.sns = [defaultEpisode('sns')];
+        if(!chronology.alt.length) chronology.alt = [defaultEpisode('alt')];
+        return {
+          id:uid('char'),
+          labelImage: label?.querySelector('img')?.getAttribute('src') || content.querySelector('av img')?.getAttribute('src') || state.characters[0].labelImage,
+          labelText: label?.querySelector('span') ? normalizeSpace(label.querySelector('span').textContent) : (enName || ruName || `Персонаж ${index+1}`),
+          profileUrl: nameAnchor?.getAttribute('href') || '#',
+          ruName: ruName || `Имя Фамилия ${index+1}`,
+          enName: enName || label?.querySelector('span')?.textContent || `Name Surname ${index+1}`,
+          avatarUrl: content.querySelector('av img')?.getAttribute('src') || label?.querySelector('img')?.getAttribute('src') || '',
+          about: normalizeSpace(content.querySelector('about')?.textContent || 'цитата или короткое инфо'),
+          chronology
+        };
+      });
+    }
+
+    const assets = state.assets;
+    const pbgWrap = root.querySelector('.fst-block wrap');
+    const lbgWrap = root.querySelector('.lsfn-block wrap');
+    const plWrap = root.querySelector('.sec-block wrap');
+    const achWrap = root.querySelector('.th-block wrap');
+    const colWrap = root.querySelector('.th2-block wrap');
+    const cpnWrap = root.querySelector('.th3-block wrap');
+
+    assets.rawProfileHtml = pbgWrap ? pbgWrap.innerHTML.trim() : assets.rawProfileHtml;
+    assets.rawLsBgHtml = lbgWrap ? lbgWrap.innerHTML.trim() : assets.rawLsBgHtml;
+    assets.rawPlashkiHtml = plWrap ? plWrap.innerHTML.trim() : assets.rawPlashkiHtml;
+    assets.rawAchievementsHtml = achWrap ? achWrap.innerHTML.trim() : assets.rawAchievementsHtml;
+    assets.rawCollectionsHtml = colWrap ? colWrap.innerHTML.trim() : assets.rawCollectionsHtml;
+    assets.rawCouponsHtml = cpnWrap ? cpnWrap.innerHTML.trim() : assets.rawCouponsHtml;
+
+    const pbg = extractWrapItems(pbgWrap, 'img');
+    const lbg = extractWrapItems(lbgWrap, 'img');
+    const plashki = extractWrapItems(plWrap, 'plash');
+    const ach = extractWrapItems(achWrap, 'tip');
+    const col = extractWrapItems(colWrap, 'tip');
+    const coupons = parseCoupons(cpnWrap);
+
+    if(pbg.length) assets.profileBackgrounds = pbg;
+    if(lbg.length) assets.lsBackgrounds = lbg;
+    if(plashki.length) assets.plashki = plashki;
+    if(ach.length) assets.achievements = ach;
+    if(col.length) assets.collections = col;
+    assets.coupons = coupons;
+
+    state.characters.forEach(char => {
+      if(!char.chronology.rawHtml){
+        char.chronology.rawHtml = generateChronologyInnerHtml(char.chronology);
+      }
+    });
+
+    return state;
+  }catch(err){
+    console.error(err);
+    return defaultState();
+  }
+}
+
+function renderEpisodeHtml(item, klass){
+  return `                <div class="${klass}">\n`+
+         `                    <a href="${escapeAttr(item.link || '#')}"><span>${escapeHtml(item.date || '')}</span> ${escapeHtml(item.title || '')}</a>\n`+
+         `                    <span><a href="${escapeAttr(item.partnerUrl || '#')}">${escapeHtml(item.partnerName || '')}</a><a href="${escapeAttr(item.playerUrl || '#')}">${escapeHtml(item.playerName || '')}</a></span>\n`+
+         `                </div>`;
+}
+
+function generateChronologyInnerHtml(chronology){
+  return [
+    '',
+    `                <div class="ep-altn">${escapeHtml(chronology.mainTitle || 'Основная игра')}</div>`,
+    ...(chronology.main || []).map(item => renderEpisodeHtml(item, 'ep-link')),
+    '',
+    `                <div class="ep-altn">${escapeHtml(chronology.snsTitle || 'СНС эпизоды')}</div>`,
+    ...(chronology.sns || []).map(item => renderEpisodeHtml(item, 'ep-sns')),
+    '',
+    `                <div class="ep-altn">${escapeHtml(chronology.altTitle || 'Альтернатива')}</div>`,
+    ...(chronology.alt || []).map(item => renderEpisodeHtml(item, 'ep-alt')),
+    chronology.extraHtml ? `\n${chronology.extraHtml.trim()}\n` : ''
+  ].join('\n');
+}
+
+function ensureRawCaches(state){
+  state.characters.forEach(char => {
+    if(!char.chronology.rawHtml || !char.chronology.rawHtml.trim()){
+      char.chronology.rawHtml = generateChronologyInnerHtml(char.chronology);
+    }
+  });
+  const a = state.assets;
+  if(!a.rawProfileHtml) a.rawProfileHtml = a.profileBackgrounds.map(item => `<img src="${escapeAttr(item.src)}">`).join('\n');
+  if(!a.rawLsBgHtml) a.rawLsBgHtml = a.lsBackgrounds.map(item => `<img class="fon" src="${escapeAttr(item.src)}">`).join('\n');
+  if(!a.rawPlashkiHtml) a.rawPlashkiHtml = a.plashki.map(item => `<div class="pf-plash" style="background: url(${escapeAttr(item.bg)});">${escapeHtml(item.title)} <span class="pf-plash__sub">${escapeHtml(item.subtitle)}</span></div>`).join('\n');
+  if(!a.rawAchievementsHtml) a.rawAchievementsHtml = a.achievements.map(item => `<div class="char-tip"><img src="${escapeAttr(item.img)}"><span>${escapeHtml(item.text)}</span></div>`).join('\n');
+  if(!a.rawCollectionsHtml) a.rawCollectionsHtml = a.collections.map(item => `<div class="char-tip"><img src="${escapeAttr(item.img)}"><span>${escapeHtml(item.text)}</span></div>`).join('\n');
+  if(!a.rawCouponsHtml) a.rawCouponsHtml = buildCouponsHtml(a.coupons);
+}
+
+function buildCouponsHtml(coupons){
+  const catalogHtml = (coupons.catalog || []).map(item => {
+    const cls = Number(item.qty) > 0 ? '' : ' class="nema"';
+    return ` <div class="char-tip"> <img${cls}  src="${escapeAttr(item.src)}"><span>${escapeHtml(item.label)}: ${Number(item.qty) || 0} шт</span></div>`;
+  }).join('\n');
+  const customHtml = (coupons.custom || []).map(item => {
+    const cls = Number(item.qty) > 0 ? '' : ' class="nema"';
+    return ` <div class="char-tip"> <img${cls}  src="${escapeAttr(item.src)}"><span>${escapeHtml(item.label)}: ${Number(item.qty) || 0} шт</span></div>`;
+  }).join('\n');
+  return [catalogHtml, customHtml].filter(Boolean).join('\n');
+}
+
+function generateLsCode(state){
+  ensureRawCaches(state);
+  const chars = state.characters.length ? state.characters : [defaultCharacter(1)];
+  const radios = chars.map((char, index)=> `    <input type="radio" name="char-tabs" id="char-tab-${index+1}" class="char-tab-input"${index===0 ? ' checked' : ''}>`).join('\n');
+  const labels = chars.map((char, index)=>[
+    '        <label for="char-tab-'+(index+1)+'" class="char-tip">',
+    `            <img src="${escapeAttr(char.labelImage || char.avatarUrl)}" style="width:40px; border-radius:4px;">`,
+    `            <span>${escapeHtml(char.labelText || char.enName || char.ruName)}</span>`,
+    '        </label>'
+  ].join('\n')).join('\n\n');
+
+  const charBlocks = chars.map((char, index)=>{
+    const chronoHtml = char.chronology.rawEnabled ? (char.chronology.rawHtml || '') : generateChronologyInnerHtml(char.chronology);
+    return [
+      `    <!-- ПЕРСОНАЖ ${index+1} -->`,
+      '',
+      `    <div class="char-content char-content-${index+1}">`,
+      `        <name><a href="${escapeAttr(char.profileUrl || '#')}"><span class="char-ru">${escapeHtml(char.ruName || '')}</span> <span class="char-en">${escapeHtml(char.enName || '')}</span></a></name>`,
+      `        <av><img src="${escapeAttr(char.avatarUrl || char.labelImage || '')}"></av>`,
+      `        <about>${escapeHtml(char.about || '')}</about>`,
+      '',
+      ' <!-- ХРОНО -->',
+      '',
+      '        <div class="eps-ls">',
+      '            <ls>',
+      chronoHtml,
+      '            </ls>',
+      '        </div>',
+      '    </div>',
+      '',
+      `  <!-- КОНЕЦ ПЕРСОНАЖ ${index+1} -->`,
+      ''
+    ].join('\n');
+  }).join('\n\n');
+
+  const assets = state.assets;
+  const pbgHtml = assets.rawEnabled ? assets.rawProfileHtml : assets.profileBackgrounds.map(item => `<img src="${escapeAttr(item.src)}">`).join('\n');
+  const lbgHtml = assets.rawEnabled ? assets.rawLsBgHtml : assets.lsBackgrounds.map(item => `<img class="fon" src="${escapeAttr(item.src)}">`).join('\n');
+  const plHtml = assets.rawEnabled ? assets.rawPlashkiHtml : assets.plashki.map(item => `<div class="pf-plash" style="background: url(${escapeAttr(item.bg)});">${escapeHtml(item.title)} <span class="pf-plash__sub">${escapeHtml(item.subtitle)}</span></div>`).join('\n');
+  const achHtml = assets.rawEnabled ? assets.rawAchievementsHtml : assets.achievements.map(item => `<div class="char-tip"><img src="${escapeAttr(item.img)}"><span>${escapeHtml(item.text)}</span></div>`).join('\n');
+  const colHtml = assets.rawEnabled ? assets.rawCollectionsHtml : assets.collections.map(item => `<div class="char-tip"> <img src="${escapeAttr(item.img)}"><span>${escapeHtml(item.text)}</span></div>`).join('\n');
+  const cpnHtml = assets.rawEnabled ? assets.rawCouponsHtml : buildCouponsHtml(assets.coupons);
+
+  return [
+"<div class='character'> ",
+"<info>",
+"",
+"<!-- ЛЕВАЯ ЧАСТЬ -->",
+"<div class=\"crow-info\">",
+"",
+"    <!--- ФОН ЛИЧНОЙ СТРАНИЦЫ --->",
+`    <img class=\"fon\" src=\"${escapeAttr(state.pageBackground || '')}\">`,
+"",
+"    <!-- переключатели персонажей  -->",
+radios,
+"",
+"",
+"    <!-- ИКОНКИ-ПЕРЕКЛЮЧАТЕЛИ МЕНЯЕМ АДРЕС КАРТИНОК -->",
+"",
+"<div class=\"ls-twnk\">",
+"",
+labels,
+"",
+"</div>",
+"",
+"",
+charBlocks,
+"",
+"</div>",
+"",
+"",
+"",
+"<!--КОНЕЦ-->",
+"",
+"<div class=\"blood-act\">",
+"",
+"",
+"<!--НАЧАЛО ВКЛАДОК-->",
+"",
+" <!-- Скрытые радиокнопки для переключения вкладок -->",
+"        <input type=\"radio\" name=\"tabs\" id=\"tab1\" class=\"tab-input\" checked>",
+"        <input type=\"radio\" name=\"tabs\" id=\"tab2\" class=\"tab-input\">",
+"        ",
+"        <!-- Заголовки вкладок -->",
+"        <div class=\"tabs-header\">",
+"            <label for=\"tab1\" class=\"tab\">Фоны и плашки</label>",
+"            <label for=\"tab2\" class=\"tab\">Ачивки и коллекция</label>",
+"        </div>",
+"        ",
+"        <!-- Содержимое вкладок -->",
+"        <div class=\"tab-content tab-content-1\">",
+"",
+"<!--ПЕРВАЯ ВКЛАДКА-->",
+"",
+"<div class=\"ls-bl\">",
+"",
+"<!--ФОНЫ 1-->",
+"<div class=\"fst-block\"><span>фоны профиля</span>",
+"<wrap>",
+pbgHtml,
+"",
+"</wrap>",
+"</div>",
+"<!--ФОНЫ 1-->",
+"",
+"<!--ФОНЫ 2-->",
+"<div class=\"lsfn-block\"><span>фоны лс</span>",
+"<wrap>",
+lbgHtml,
+"",
+"</wrap>",
+"</div>",
+"",
+"</div>",
+"",
+"<!--ФОНЫ 2-->",
+"",
+"<!--ПЛАШКИ-->",
+"",
+"<div class=\"ls-bl2\">",
+"",
+"<div class=\"sec-block\"><span>плашки</span>",
+"<wrap>",
+plHtml,
+"</wrap>",
+"</div>",
+"",
+"<!--ПЛАШКИ-->",
+"",
+"</div>",
+"",
+"",
+"<!--КОНЕЦ ПЕРВАЯ ВКЛАДКА-->",
+"        </div>",
+"        ",
+"        <div class=\"tab-content tab-content-2\">",
+"<!--ВТОРАЯ ВКЛАДКА-->",
+"",
+"<div class=\"ls2-bl\">",
+"",
+"<!--ачивки-->",
+"<div class=\"th-block\"><span>ачивки и подарки</span>",
+"<wrap >",
+achHtml,
+"</wrap>",
+"</div>",
+"<!--ачивки-->",
+"",
+"",
+"<!--коллекции-->",
+"<div class=\"th2-block\" class=\"char-tip\"><span>коллекция</span>",
+"<wrap>",
+colHtml,
+"",
+"</wrap>",
+"</div>",
+"<!--коллекции-->",
+"",
+"</div>",
+"",
+"<div class=\"ls2-cpn\">",
+"",
+"<!--купоны-->",
+"<div class=\"th3-block\"><span>купоны</span>",
+"<wrap>",
+cpnHtml,
+"</wrap>",
+"</div>",
+"<!--купоны-->",
+"",
+"</div>",
+"",
+"",
+"",
+"",
+"<!--КОНЕЦ ВТОРАЯ ВКЛАДКА-->",
+"",
+"    </div>",
+"",
+"<!--КОНЕЦ ВКЛАДОК-->",
+"",
+"",
+"",
+"",
+"</div>",
+"",
+"</info>",
+"</div>"
+  ].join('\n');
+}
+
+function getSelectedCharacter(state, mode){
+  const selectedId = mode === 'new' ? appState.newSelectedCharId : appState.editSelectedCharId;
+  let char = state.characters.find(item => item.id === selectedId);
+  if(!char && state.characters.length){
+    char = state.characters[0];
+    if(mode === 'new') appState.newSelectedCharId = char.id;
+    if(mode === 'edit') appState.editSelectedCharId = char.id;
+  }
+  return char;
+}
+
+function renderCharacterList(mode){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  const listEl = mode === 'new' ? dom.newCharList : dom.editCharList;
+  const search = normalizeSpace((mode === 'new' ? dom.newCharSearch.value : dom.editCharSearch.value).toLowerCase());
+  const selected = mode === 'new' ? appState.newSelectedCharId : appState.editSelectedCharId;
+  listEl.innerHTML = '';
+  const items = state.characters.filter(char => {
+    if(!search) return true;
+    return [char.ruName, char.enName, char.labelText].join(' ').toLowerCase().includes(search);
+  });
+  if(!items.length){
+    listEl.innerHTML = `<div class="info-badge">Ничего не найдено.</div>`;
+    return;
+  }
+  items.forEach((char, index)=>{
+    const btn = document.createElement('button');
+    btn.className = 'item-btn' + (selected === char.id ? ' active' : '');
+    btn.innerHTML = `<strong>${escapeHtml(char.ruName || `Персонаж ${index+1}`)}</strong><br><span class="small">${escapeHtml(char.enName || char.labelText || '')}</span>`;
+    btn.addEventListener('click', ()=>{
+      if(mode === 'new') appState.newSelectedCharId = char.id;
+      else appState.editSelectedCharId = char.id;
+      renderCharacterEditor(mode);
+      renderCharacterList(mode);
+    });
+    listEl.appendChild(btn);
+  });
+}
+
+function renderEpisodeEditor(mode, char, type, label){
+  const state = char.chronology[type];
+  return `
+    <div class="entry">
+      <div class="entry-head">
+        <div class="entry-title">${label}</div>
+        <button class="soft-btn" data-action="add-episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}">Добавить</button>
+      </div>
+      <div class="field">
+        <label>Заголовок блока</label>
+        <input class="input" data-action="chrono-title" data-mode="${mode}" data-char="${char.id}" data-type="${type}" value="${escapeAttr(char.chronology[`${type}Title`] || '')}">
+      </div>
+      <div class="episode-list">
+        ${(state || []).map((item, index)=> `
+          <div class="entry">
+            <div class="entry-head">
+              <div class="entry-title">${label} #${index+1}</div>
+              <button class="icon-btn" title="Удалить" data-action="remove-episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}" data-index="${index}">×</button>
+            </div>
+            <div class="field-grid three">
+              <div class="field"><label>Дата / метка</label><input class="input" data-action="episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}" data-index="${index}" data-key="date" value="${escapeAttr(item.date || '')}"></div>
+              <div class="field"><label>Ссылка эпизода</label><input class="input" data-action="episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}" data-index="${index}" data-key="link" value="${escapeAttr(item.link || '#')}"></div>
+              <div class="field"><label>Название</label><input class="input" data-action="episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}" data-index="${index}" data-key="title" value="${escapeAttr(item.title || '')}"></div>
+            </div>
+            <div class="field-grid">
+              <div class="field"><label>Имя персонажа</label><input class="input" data-action="episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}" data-index="${index}" data-key="partnerName" value="${escapeAttr(item.partnerName || '')}"></div>
+              <div class="field"><label>Ссылка на персонажа</label><input class="input" data-action="episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}" data-index="${index}" data-key="partnerUrl" value="${escapeAttr(item.partnerUrl || '#')}"></div>
+            </div>
+            <div class="field-grid">
+              <div class="field"><label>Имя игрока</label><input class="input" data-action="episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}" data-index="${index}" data-key="playerName" value="${escapeAttr(item.playerName || '')}"></div>
+              <div class="field"><label>Ссылка на игрока</label><input class="input" data-action="episode" data-mode="${mode}" data-char="${char.id}" data-type="${type}" data-index="${index}" data-key="playerUrl" value="${escapeAttr(item.playerUrl || '#')}"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderCharacterEditor(mode){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  const host = mode === 'new' ? dom.newCharEditor : dom.editCharEditor;
+  const char = getSelectedCharacter(state, mode);
+  if(!char){
+    host.innerHTML = '<div class="info-badge">Персонажей пока нет.</div>';
+    return;
+  }
+  host.innerHTML = `
+    <div class="entry">
+      <div class="entry-head">
+        <div class="entry-title">${escapeHtml(char.ruName || 'Персонаж')}</div>
+        <div class="group-actions">
+          <button class="soft-btn" data-action="duplicate-char" data-mode="${mode}" data-char="${char.id}">Дублировать</button>
+          <button class="danger-btn" data-action="remove-char" data-mode="${mode}" data-char="${char.id}">Удалить</button>
+        </div>
+      </div>
+      <div class="field-grid">
+        <div class="field"><label>Русское имя</label><input class="input" data-action="char-field" data-mode="${mode}" data-char="${char.id}" data-key="ruName" value="${escapeAttr(char.ruName || '')}"></div>
+        <div class="field"><label>Английское имя</label><input class="input" data-action="char-field" data-mode="${mode}" data-char="${char.id}" data-key="enName" value="${escapeAttr(char.enName || '')}"></div>
+      </div>
+      <div class="field-grid">
+        <div class="field"><label>Ярлык в переключателе</label><input class="input" data-action="char-field" data-mode="${mode}" data-char="${char.id}" data-key="labelText" value="${escapeAttr(char.labelText || '')}"></div>
+        <div class="field"><label>Ссылка на профиль</label><input class="input" data-action="char-field" data-mode="${mode}" data-char="${char.id}" data-key="profileUrl" value="${escapeAttr(char.profileUrl || '#')}"></div>
+      </div>
+      <div class="field-grid">
+        <div class="field"><label>Аватар / картинка персонажа</label><input class="input" data-action="char-field" data-mode="${mode}" data-char="${char.id}" data-key="avatarUrl" value="${escapeAttr(char.avatarUrl || '')}"></div>
+        <div class="field"><label>Иконка переключателя</label><input class="input" data-action="char-field" data-mode="${mode}" data-char="${char.id}" data-key="labelImage" value="${escapeAttr(char.labelImage || '')}"></div>
+      </div>
+      <div class="field"><label>Цитата / короткое инфо</label><textarea class="textarea" data-action="char-field" data-mode="${mode}" data-char="${char.id}" data-key="about">${escapeHtml(char.about || '')}</textarea></div>
+      <div class="switch-row section-divider">
+        <span class="small">Raw-режим хроно для этого персонажа</span>
+        <label class="switch"><input type="checkbox" data-action="toggle-char-raw" data-mode="${mode}" data-char="${char.id}" ${char.chronology.rawEnabled ? 'checked' : ''}><span></span></label>
+      </div>
+      ${char.chronology.rawEnabled ? `
+        <div class="field"><label>Raw HTML внутри &lt;ls&gt;</label><textarea class="textarea" style="min-height:300px" data-action="char-raw-html" data-mode="${mode}" data-char="${char.id}">${escapeHtml(char.chronology.rawHtml || '')}</textarea></div>
+      ` : `
+        <div class="stack section-divider">
+          ${renderEpisodeEditor(mode, char, 'main', 'Основная игра')}
+          ${renderEpisodeEditor(mode, char, 'sns', 'СНС эпизоды')}
+          ${renderEpisodeEditor(mode, char, 'alt', 'Альтернатива')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderAssetArrayEditor(mode, title, key, array, fields){
+  return `
+    <div class="asset">
+      <div class="asset-head">
+        <div class="asset-title">${title}</div>
+        <button class="soft-btn" data-action="add-asset" data-mode="${mode}" data-key="${key}">Добавить</button>
+      </div>
+      <div class="asset-list">
+        ${(array || []).map((item, index)=> `
+          <div class="asset">
+            <div class="asset-head">
+              <div class="asset-title">${title} #${index+1}</div>
+              <button class="icon-btn" data-action="remove-asset" data-mode="${mode}" data-key="${key}" data-index="${index}">×</button>
+            </div>
+            ${fields.map(field => `
+              <div class="field">
+                <label>${field.label}</label>
+                ${field.type === 'textarea'
+                  ? `<textarea class="textarea" data-action="asset-field" data-mode="${mode}" data-key="${key}" data-index="${index}" data-field="${field.name}">${escapeHtml(item[field.name] || '')}</textarea>`
+                  : `<input class="input" data-action="asset-field" data-mode="${mode}" data-key="${key}" data-index="${index}" data-field="${field.name}" value="${escapeAttr(item[field.name] || '')}">`
+                }
+              </div>
+            `).join('')}
+          </div>
+        `).join('') || '<div class="info-badge">Пока пусто.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderCouponsEditor(mode, coupons){
+  return `
+    <div class="asset">
+      <div class="asset-head">
+        <div class="asset-title">Купоны</div>
+        <button class="soft-btn" data-action="add-custom-coupon" data-mode="${mode}">Добавить кастомный</button>
+      </div>
+      <div class="coupon-list">
+        ${(coupons.catalog || []).map((item, index)=> `
+          <div class="coupon-entry">
+            <div class="coupon-head">
+              <div class="coupon-title">${escapeHtml(item.label)}</div>
+              <div class="meta-row"><span class="char-chip">${Number(item.qty) > 0 ? 'есть' : 'нет'}</span></div>
+            </div>
+            <div class="field-grid three">
+              <div class="field"><label>Картинка</label><input class="input" data-action="coupon-field" data-mode="${mode}" data-kind="catalog" data-index="${index}" data-key="src" value="${escapeAttr(item.src || '')}"></div>
+              <div class="field"><label>Подпись</label><input class="input" data-action="coupon-field" data-mode="${mode}" data-kind="catalog" data-index="${index}" data-key="label" value="${escapeAttr(item.label || '')}"></div>
+              <div class="field"><label>Количество</label><input class="input" type="number" min="0" data-action="coupon-field" data-mode="${mode}" data-kind="catalog" data-index="${index}" data-key="qty" value="${Number(item.qty) || 0}"></div>
+            </div>
+          </div>
+        `).join('')}
+        ${(coupons.custom || []).map((item, index)=> `
+          <div class="coupon-entry">
+            <div class="coupon-head">
+              <div class="coupon-title">Кастомный купон #${index+1}</div>
+              <button class="icon-btn" data-action="remove-custom-coupon" data-mode="${mode}" data-index="${index}">×</button>
+            </div>
+            <div class="field-grid three">
+              <div class="field"><label>Картинка</label><input class="input" data-action="coupon-field" data-mode="${mode}" data-kind="custom" data-index="${index}" data-key="src" value="${escapeAttr(item.src || '')}"></div>
+              <div class="field"><label>Подпись</label><input class="input" data-action="coupon-field" data-mode="${mode}" data-kind="custom" data-index="${index}" data-key="label" value="${escapeAttr(item.label || '')}"></div>
+              <div class="field"><label>Количество</label><input class="input" type="number" min="0" data-action="coupon-field" data-mode="${mode}" data-kind="custom" data-index="${index}" data-key="qty" value="${Number(item.qty) || 0}"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderAssetsEditor(mode){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  const host = mode === 'new' ? dom.newAssetsEditor : dom.editAssetsEditor;
+  const assets = state.assets;
+  if(assets.rawEnabled){
+    host.innerHTML = `
+      <div class="warning">Raw-режим полезен, если в блоке уже есть сложный кастомный HTML и ты не хочешь, чтобы редактор его пересобирал визуально.</div>
+      <div class="raw-grid">
+        ${renderRawCard(mode,'rawProfileHtml','Фоны профиля',assets.rawProfileHtml)}
+        ${renderRawCard(mode,'rawLsBgHtml','Фоны ЛС',assets.rawLsBgHtml)}
+        ${renderRawCard(mode,'rawPlashkiHtml','Плашки',assets.rawPlashkiHtml)}
+        ${renderRawCard(mode,'rawAchievementsHtml','Ачивки и подарки',assets.rawAchievementsHtml)}
+        ${renderRawCard(mode,'rawCollectionsHtml','Коллекция',assets.rawCollectionsHtml)}
+        ${renderRawCard(mode,'rawCouponsHtml','Купоны',assets.rawCouponsHtml || buildCouponsHtml(assets.coupons))}
+      </div>
+    `;
+    return;
+  }
+  host.innerHTML = `
+    ${renderAssetArrayEditor(mode,'Фоны профиля','profileBackgrounds',assets.profileBackgrounds,[{label:'Ссылка на картинку',name:'src'}])}
+    ${renderAssetArrayEditor(mode,'Фоны ЛС','lsBackgrounds',assets.lsBackgrounds,[{label:'Ссылка на картинку',name:'src'}])}
+    ${renderAssetArrayEditor(mode,'Плашки','plashki',assets.plashki,[{label:'Фон плашки',name:'bg'},{label:'Основной текст',name:'title'},{label:'Подпись',name:'subtitle'}])}
+    ${renderAssetArrayEditor(mode,'Ачивки и подарки','achievements',assets.achievements,[{label:'Картинка',name:'img'},{label:'Текст',name:'text'}])}
+    ${renderAssetArrayEditor(mode,'Коллекция','collections',assets.collections,[{label:'Картинка',name:'img'},{label:'Текст',name:'text'}])}
+    ${renderCouponsEditor(mode, assets.coupons)}
+  `;
+}
+
+function renderRawCard(mode,key,title,value){
+  return `
+    <div class="raw-card">
+      <div class="raw-card-head">
+        <div class="asset-title">${title}</div>
+        <span class="char-chip">вставляется внутрь &lt;wrap&gt;</span>
+      </div>
+      <div class="field">
+        <textarea class="textarea" style="min-height:220px" data-action="raw-asset" data-mode="${mode}" data-key="${key}">${escapeHtml(value || '')}</textarea>
+      </div>
+    </div>
+  `;
+}
+
+function addCharacter(mode){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  const char = defaultCharacter(state.characters.length + 1);
+  state.characters.push(char);
+  if(mode === 'new') appState.newSelectedCharId = char.id;
+  else appState.editSelectedCharId = char.id;
+  renderMode(mode);
+}
+
+function removeCharacter(mode, id){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  if(state.characters.length <= 1) return;
+  state.characters = state.characters.filter(char => char.id !== id);
+  if(mode === 'new' && appState.newSelectedCharId === id) appState.newSelectedCharId = state.characters[0]?.id || null;
+  if(mode === 'edit' && appState.editSelectedCharId === id) appState.editSelectedCharId = state.characters[0]?.id || null;
+  renderMode(mode);
+}
+
+function duplicateCharacter(mode, id){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  const original = state.characters.find(char => char.id === id);
+  if(!original) return;
+  const clone = deepClone(original);
+  clone.id = uid('char');
+  clone.ruName = `${clone.ruName} копия`;
+  clone.enName = `${clone.enName} copy`;
+  clone.labelText = `${clone.labelText} copy`;
+  ['main','sns','alt'].forEach(key => clone.chronology[key].forEach(item => item.id = uid('ep')));
+  state.characters.push(clone);
+  if(mode === 'new') appState.newSelectedCharId = clone.id;
+  else appState.editSelectedCharId = clone.id;
+  renderMode(mode);
+}
+
+function addAsset(mode, key){
+  const assets = (mode === 'new' ? appState.newState : appState.editState).assets;
+  const defaults = {
+    profileBackgrounds:{id:uid('pbg'),src:''},
+    lsBackgrounds:{id:uid('lbg'),src:''},
+    plashki:{id:uid('pl'),bg:'',title:'',subtitle:''},
+    achievements:{id:uid('ach'),img:'',text:''},
+    collections:{id:uid('col'),img:'',text:''}
+  };
+  assets[key].push(defaults[key]);
+  renderMode(mode);
+}
+
+function removeAsset(mode, key, index){
+  const assets = (mode === 'new' ? appState.newState : appState.editState).assets;
+  assets[key].splice(index,1);
+  renderMode(mode);
+}
+
+function addEpisode(mode, charId, type){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  const char = state.characters.find(item => item.id === charId);
+  if(!char) return;
+  char.chronology[type].push(defaultEpisode(type));
+  renderMode(mode);
+}
+
+function removeEpisode(mode, charId, type, index){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  const char = state.characters.find(item => item.id === charId);
+  if(!char) return;
+  char.chronology[type].splice(index,1);
+  if(!char.chronology[type].length) char.chronology[type].push(defaultEpisode(type));
+  renderMode(mode);
+}
+
+function renderMode(mode){
+  const state = mode === 'new' ? appState.newState : appState.editState;
+  if(mode === 'new') dom.newPageBg.value = state.pageBackground || '';
+  if(mode === 'edit') dom.editPageBg.value = state.pageBackground || '';
+
+  renderCharacterList(mode);
+  renderCharacterEditor(mode);
+  renderAssetsEditor(mode);
+
+  const code = generateLsCode(state);
+  if(mode === 'new'){
+    appState.newOutput = code;
+    setStaticCode(dom.newOutputPre, code);
+    dom.newOutputStats.textContent = `${code.length.toLocaleString('ru-RU')} символов`;
+  }else{
+    appState.editOutput = code;
+    setStaticCode(dom.editOutputPre, code);
+    dom.editOutputStats.textContent = `${code.length.toLocaleString('ru-RU')} символов`;
+  }
+}
+
+function setupDom(){
+  dom.themeButtons = document.querySelectorAll('[data-theme]');
+  dom.pageButtons = document.querySelectorAll('[data-page]');
+  dom.pages = document.querySelectorAll('[data-page-panel]');
+
+  dom.newPageBg = document.getElementById('new-page-bg');
+  dom.newCharSearch = document.getElementById('new-char-search');
+  dom.newCharList = document.getElementById('new-char-list');
+  dom.newCharEditor = document.getElementById('new-char-editor');
+  dom.newAssetsEditor = document.getElementById('new-assets-editor');
+  dom.newOutputPre = document.getElementById('new-output-pre');
+  dom.newOutputStats = document.getElementById('new-output-stats');
+  dom.newRawToggle = document.getElementById('new-raw-toggle');
+
+  dom.editInputArea = document.getElementById('edit-input-area');
+  dom.editInputPre = document.getElementById('edit-input-pre');
+  dom.editStatus = document.getElementById('edit-status');
+  dom.editPageBg = document.getElementById('edit-page-bg');
+  dom.editCharSearch = document.getElementById('edit-char-search');
+  dom.editCharList = document.getElementById('edit-char-list');
+  dom.editCharEditor = document.getElementById('edit-char-editor');
+  dom.editAssetsEditor = document.getElementById('edit-assets-editor');
+  dom.editOutputPre = document.getElementById('edit-output-pre');
+  dom.editOutputStats = document.getElementById('edit-output-stats');
+  dom.editRawToggle = document.getElementById('edit-raw-toggle');
+}
+
+function switchTheme(theme){
+  appState.theme = theme;
+  document.body.classList.toggle('theme-light', theme === 'light');
+  document.body.classList.toggle('theme-dark', theme !== 'light');
+  dom.themeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.theme === theme));
+}
+
+function switchPage(page){
+  appState.page = page;
+  dom.pageButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
+  dom.pages.forEach(panel => panel.classList.toggle('active', panel.dataset.pagePanel === page));
+}
+
+function attachStaticEvents(){
+  dom.themeButtons.forEach(btn => btn.addEventListener('click', ()=> switchTheme(btn.dataset.theme)));
+  dom.pageButtons.forEach(btn => btn.addEventListener('click', ()=> switchPage(btn.dataset.page)));
+
+  dom.newPageBg.addEventListener('input', e => { appState.newState.pageBackground = e.target.value; renderMode('new'); });
+  dom.editPageBg.addEventListener('input', e => { appState.editState.pageBackground = e.target.value; renderMode('edit'); });
+
+  dom.newCharSearch.addEventListener('input', ()=> renderCharacterList('new'));
+  dom.editCharSearch.addEventListener('input', ()=> renderCharacterList('edit'));
+
+  dom.newRawToggle.addEventListener('change', e => { appState.newState.assets.rawEnabled = e.target.checked; renderAssetsEditor('new'); renderMode('new'); });
+  dom.editRawToggle.addEventListener('change', e => { appState.editState.assets.rawEnabled = e.target.checked; renderAssetsEditor('edit'); renderMode('edit'); });
+
+  document.getElementById('new-add-char').addEventListener('click', ()=> addCharacter('new'));
+  document.getElementById('edit-add-char').addEventListener('click', ()=> addCharacter('edit'));
+
+  document.getElementById('new-refresh').addEventListener('click', ()=> renderMode('new'));
+  document.getElementById('edit-refresh').addEventListener('click', ()=> renderMode('edit'));
+  document.getElementById('new-reset').addEventListener('click', ()=> {
+    appState.newState = parseExistingCode(DEFAULT_TEMPLATE);
+    appState.newSelectedCharId = appState.newState.characters[0]?.id || null;
+    dom.newRawToggle.checked = !!appState.newState.assets.rawEnabled;
+    renderMode('new');
+  });
+
+  document.getElementById('edit-load-default').addEventListener('click', ()=> {
+    dom.editInputArea.value = DEFAULT_TEMPLATE;
+    syncEditableCode(dom.editInputArea, dom.editInputPre);
+    loadEditFromInput();
+  });
+
+  document.getElementById('edit-load').addEventListener('click', loadEditFromInput);
+  document.getElementById('edit-clear').addEventListener('click', ()=> {
+    dom.editInputArea.value = '';
+    syncEditableCode(dom.editInputArea, dom.editInputPre);
+  });
+
+  dom.editInputArea.addEventListener('input', ()=> syncEditableCode(dom.editInputArea, dom.editInputPre));
+  dom.editInputArea.addEventListener('scroll', ()=> {
+    dom.editInputPre.scrollTop = dom.editInputArea.scrollTop;
+    dom.editInputPre.scrollLeft = dom.editInputArea.scrollLeft;
+  });
+
+  const copyButtons = [
+    ['new-copy', ()=>appState.newOutput],
+    ['new-copy-top', ()=>appState.newOutput],
+    ['edit-copy', ()=>appState.editOutput],
+    ['edit-copy-top', ()=>appState.editOutput]
+  ];
+  copyButtons.forEach(([id,getter])=>{
+    const btn = document.getElementById(id);
+    btn.addEventListener('click', ()=> copyText(getter()).then(()=> updateCopyStatus(btn)).catch(()=> updateCopyStatus(btn,'Не вышло')));
+  });
+
+  document.body.addEventListener('input', handleDynamicInput);
+  document.body.addEventListener('click', handleDynamicClick);
+}
+
+function loadEditFromInput(){
+  const value = dom.editInputArea.value.trim();
+  if(!value){
+    dom.editStatus.textContent = 'Поле пустое. Вставь код ЛС и загрузи снова.';
+    return;
+  }
+  appState.editState = parseExistingCode(value);
+  appState.editSelectedCharId = appState.editState.characters[0]?.id || null;
+  dom.editRawToggle.checked = !!appState.editState.assets.rawEnabled;
+  renderMode('edit');
+  dom.editStatus.textContent = 'Код загружен. Персонажи, хроно, купоны и блоки справа готовы к редактированию.';
+}
+
+function handleDynamicInput(e){
+  const el = e.target;
+  const mode = el.dataset.mode;
+  if(!mode) return;
+  const state = mode === 'new' ? appState.newState : appState.editState;
+
+  if(el.dataset.action === 'char-field'){
+    const char = state.characters.find(item => item.id === el.dataset.char);
+    if(char){ char[el.dataset.key] = el.value; renderMode(mode); }
+  }
+
+  if(el.dataset.action === 'chrono-title'){
+    const char = state.characters.find(item => item.id === el.dataset.char);
+    if(char){ char.chronology[`${el.dataset.type}Title`] = el.value; renderMode(mode); }
+  }
+
+  if(el.dataset.action === 'episode'){
+    const char = state.characters.find(item => item.id === el.dataset.char);
+    if(char){
+      char.chronology[el.dataset.type][Number(el.dataset.index)][el.dataset.key] = el.value;
+      renderMode(mode);
+    }
+  }
+
+  if(el.dataset.action === 'toggle-char-raw'){
+    const char = state.characters.find(item => item.id === el.dataset.char);
+    if(char){
+      char.chronology.rawEnabled = el.checked;
+      if(!char.chronology.rawHtml) char.chronology.rawHtml = generateChronologyInnerHtml(char.chronology);
+      renderMode(mode);
+    }
+  }
+
+  if(el.dataset.action === 'char-raw-html'){
+    const char = state.characters.find(item => item.id === el.dataset.char);
+    if(char){ char.chronology.rawHtml = el.value; renderMode(mode); }
+  }
+
+  if(el.dataset.action === 'asset-field'){
+    state.assets[el.dataset.key][Number(el.dataset.index)][el.dataset.field] = el.value;
+    renderMode(mode);
+  }
+
+  if(el.dataset.action === 'coupon-field'){
+    const bucket = state.assets.coupons[el.dataset.kind];
+    const item = bucket[Number(el.dataset.index)];
+    if(item){
+      item[el.dataset.key] = el.dataset.key === 'qty' ? Math.max(0, Number(el.value) || 0) : el.value;
+      renderMode(mode);
+    }
+  }
+
+  if(el.dataset.action === 'raw-asset'){
+    state.assets[el.dataset.key] = el.value;
+    renderMode(mode);
+  }
+}
+
+function handleDynamicClick(e){
+  const btn = e.target.closest('[data-action]');
+  if(!btn) return;
+  const { action, mode } = btn.dataset;
+  if(action === 'remove-char') removeCharacter(mode, btn.dataset.char);
+  if(action === 'duplicate-char') duplicateCharacter(mode, btn.dataset.char);
+  if(action === 'add-episode') addEpisode(mode, btn.dataset.char, btn.dataset.type);
+  if(action === 'remove-episode') removeEpisode(mode, btn.dataset.char, btn.dataset.type, Number(btn.dataset.index));
+  if(action === 'add-asset') addAsset(mode, btn.dataset.key);
+  if(action === 'remove-asset') removeAsset(mode, btn.dataset.key, Number(btn.dataset.index));
+  if(action === 'add-custom-coupon'){
+    const coupons = (mode === 'new' ? appState.newState : appState.editState).assets.coupons;
+    coupons.custom.push({id:uid('cpn'), label:'КАСТОМНЫЙ КУПОН', src:'', qty:0});
+    renderMode(mode);
+  }
+  if(action === 'remove-custom-coupon'){
+    const coupons = (mode === 'new' ? appState.newState : appState.editState).assets.coupons;
+    coupons.custom.splice(Number(btn.dataset.index),1);
+    renderMode(mode);
+  }
+}
+
+function init(){
+  setupDom();
+  appState.newState = parseExistingCode(DEFAULT_TEMPLATE);
+  appState.editState = parseExistingCode(DEFAULT_TEMPLATE);
+  appState.newSelectedCharId = appState.newState.characters[0]?.id || null;
+  appState.editSelectedCharId = appState.editState.characters[0]?.id || null;
+  dom.newRawToggle.checked = !!appState.newState.assets.rawEnabled;
+  dom.editRawToggle.checked = !!appState.editState.assets.rawEnabled;
+  dom.editInputArea.value = DEFAULT_TEMPLATE;
+  syncEditableCode(dom.editInputArea, dom.editInputPre);
+  attachStaticEvents();
+  switchTheme('dark');
+  switchPage('new');
+  renderMode('new');
+  renderMode('edit');
+}
+
+init();
+</script>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'ls-editor-ui-v4';
+
+  const ui = {
+    settingsPop: document.getElementById('ui-settings-pop'),
+    fontScale: document.getElementById('ui-font-scale'),
+    pageWidth: document.getElementById('ui-page-width'),
+    density: document.getElementById('ui-density'),
+    codeSize: document.getElementById('ui-code-size'),
+    codeWrap: document.getElementById('ui-code-wrap'),
+    resetBtn: document.getElementById('ui-reset-settings')
+  };
+
+  function readState(){
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveState(state){
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {}
+  }
+
+  function applyUi(state, save=true){
+    const next = {
+      fontScale: state.fontScale || 'medium',
+      pageWidth: state.pageWidth || 'standard',
+      density: state.density || 'compact',
+      codeSize: state.codeSize || 'medium',
+      codeWrap: typeof state.codeWrap === 'boolean' ? state.codeWrap : true,
+      theme: state.theme || appState.theme || 'dark',
+      page: state.page || appState.page || 'new'
+    };
+
+    document.body.dataset.uiFont = next.fontScale;
+    document.body.dataset.pageWidth = next.pageWidth;
+    document.body.dataset.density = next.density;
+    document.body.dataset.codeSize = next.codeSize;
+    document.body.dataset.codeWrap = next.codeWrap ? 'on' : 'off';
+
+    ui.fontScale.value = next.fontScale;
+    ui.pageWidth.value = next.pageWidth;
+    ui.density.value = next.density;
+    ui.codeSize.value = next.codeSize;
+    ui.codeWrap.checked = !!next.codeWrap;
+
+    switchTheme(next.theme);
+    switchPage(next.page);
+
+    if(save) saveState(next);
+  }
+
+  function currentState(){
+    return {
+      fontScale: ui.fontScale.value,
+      pageWidth: ui.pageWidth.value,
+      density: ui.density.value,
+      codeSize: ui.codeSize.value,
+      codeWrap: !!ui.codeWrap.checked,
+      theme: appState.theme,
+      page: appState.page
+    };
+  }
+
+  [ui.fontScale, ui.pageWidth, ui.density, ui.codeSize].forEach(el => {
+    el.addEventListener('change', () => applyUi(currentState()));
+  });
+
+  ui.codeWrap.addEventListener('change', () => applyUi(currentState()));
+
+  ui.resetBtn.addEventListener('click', () => {
+    applyUi({});
+  });
+
+  document.querySelectorAll('[data-theme]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const state = currentState();
+      state.theme = btn.dataset.theme;
+      applyUi(state);
+    });
+  });
+
+  document.querySelectorAll('[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const state = currentState();
+      state.page = btn.dataset.page;
+      applyUi(state);
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if(!ui.settingsPop.open) return;
+    if(ui.settingsPop.contains(e.target)) return;
+    ui.settingsPop.open = false;
+  });
+
+  applyUi(readState(), false);
+  saveState(currentState());
+})();
+</script>
+</body>
+</html>
